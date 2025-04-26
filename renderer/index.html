@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Map Pin Application</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+<!-- Toolbar -->
+<div id="toolbar" class="toolbar">
+  <div class="toolbar-content">
+    <button id="uploadButton" class="btn-primary">Upload Image</button>
+    <input type="text" id="searchBar" class="input-primary flex-1" placeholder="Search notes...">
+    <button id="saveSession" class="btn-secondary">Save</button>
+    <button id="loadSession" class="btn-secondary">Load</button>
+    <button id="exportImage" class="btn-secondary">Export as PNG</button>
+    <button id="toggleSidebar" class="btn-secondary">Toggle Notes</button>
+
+  </div>
+</div>
+
+<!-- Main Area -->
+<div id="mainArea" class="main-area">
+  <!-- Canvas Container -->
+  <div class="canvas-container">
+    <canvas id="imageCanvas" class="canvas"></canvas>
+    <div id="hoverTooltip" hidden class="tooltip"></div>
+  </div>
+
+  <!-- Notes Sidebar -->
+  <div id="notesPanel" class="notes-panel">
+    <div id="notesHeader" class="notes-header">Pinned Notes</div>
+    <!-- Notes will be populated dynamically -->
+  </div>
+
+
+  <div id="modalOverlay" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2 class="note-title">Add/Edit Note</h2>
+      <input type="text" id="noteTitle" class="input-primary" placeholder="Title">
+      <textarea id="noteDescription" class="input-primary h-32" placeholder="Description"></textarea>
+      <select id="pinTag" class="input-primary">
+        <option value="default">Default</option>
+        <option value="important">Important</option>
+        <option value="warning">Warning</option>
+        <option value="info">Info</option>
+      </select>
+
+      <div class="modal-actions">
+        <button id="cancelNote" class="btn-secondary">Cancel</button>
+        <button id="saveNote" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModalOverlay" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2 class="note-title">Delete Pin</h2>
+      <p>Are you sure you want to delete this pin? This will also delete the associated note.</p>
+      <div class="modal-actions">
+        <button id="cancelDelete" class="btn-secondary">Cancel</button>
+        <button id="confirmDelete" class="btn-primary">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Context Menu -->
+  <div id="contextMenu" class="context-menu" hidden>
+    <div id="deletePin" class="context-menu-item">Delete Pin & Note</div>
+  </div>
+
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
