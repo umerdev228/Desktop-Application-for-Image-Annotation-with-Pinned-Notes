@@ -7,10 +7,10 @@ const noteTitleInput = document.getElementById('noteTitle');
 const noteDescriptionInput = document.getElementById('noteDescription');
 const saveNoteButton = document.getElementById('saveNote');
 const hoverTooltip = document.getElementById('hoverTooltip');
-const saveButton = document.getElementById('saveSession');
-const loadButton = document.getElementById('loadSession');
+// const saveButton = document.getElementById('saveSession');
+// const loadButton = document.getElementById('loadSession');
 const modalOverlay = document.getElementById('modalOverlay');
-const cancelNoteButton = document.getElementById('cancelNote');
+// const cancelNoteButton = document.getElementById('cancelNote');
 const searchBar = document.getElementById('searchBar');
 const exportButton = document.getElementById('exportImage');
 const pinTagInput = document.getElementById('pinTag');
@@ -21,6 +21,7 @@ const cancelDeleteButton = document.getElementById('cancelDelete');
 const confirmDeleteButton = document.getElementById('confirmDelete');
 const contextMenu = document.getElementById('contextMenu');
 const deletePinButton = document.getElementById('deletePin');
+const exportPdfButton = document.getElementById('exportPdf');
 
 modalOverlay.hidden = true;
 
@@ -91,31 +92,36 @@ imageCanvas.addEventListener('wheel', (e) => {
 });
 
 imageCanvas.addEventListener('mousedown', (e) => {
-  isDragging = true;
-  dragged = false;
-  startX = e.offsetX - originX;
-  startY = e.offsetY - originY;
+  if (e.button === 0) { // Only set dragging state on left-click (button 0)
+    isDragging = true;
+    dragged = false;
+    startX = e.offsetX - originX;
+    startY = e.offsetY - originY;
 
-  // Record mouse down position
-  mouseDownX = e.clientX;
-  mouseDownY = e.clientY;
+    // Record mouse down position
+    mouseDownX = e.clientX;
+    mouseDownY = e.clientY;
+  }
 });
 
 imageCanvas.addEventListener('mouseup', (e) => {
   if (e.button !== 0) return; // Only left-click
 
+  // Calculate distance mouse moved
   const distance = Math.sqrt((e.clientX - mouseDownX) ** 2 + (e.clientY - mouseDownY) ** 2);
 
-  if (distance < 5) { // 🔥 Treat as real click
+  // Only open modal if: no dragging + tiny movement
+  if (!dragged && distance < 5) {
     const mouse = getCanvasCoordinates(e);
     const clickedPin = getPinAtPosition(mouse.x, mouse.y);
 
     if (clickedPin) {
       activePin = clickedPin;
-    } else {
+      openNoteModal();
+    } else if (img.src) { // Only create new pin if an image is loaded
       activePin = { x: mouse.x, y: mouse.y, title: '', description: '', tag: 'default' };
+      openNoteModal();
     }
-    openNoteModal();
   }
 
   isDragging = false;
@@ -123,11 +129,11 @@ imageCanvas.addEventListener('mouseup', (e) => {
 
 imageCanvas.addEventListener('mousemove', (e) => {
   if (isDragging) {
-    const moveX = Math.abs(e.offsetX - (startX + originX));
-    const moveY = Math.abs(e.offsetY - (startY + originY));
+    const moveX = Math.abs(e.clientX - mouseDownX);
+    const moveY = Math.abs(e.clientY - mouseDownY);
 
     if (moveX > 5 || moveY > 5) {
-      dragged = true; // if moved more than 5px, consider dragging
+      dragged = true;
     }
 
     originX = e.offsetX - startX;
@@ -145,22 +151,13 @@ imageCanvas.addEventListener('mousemove', (e) => {
   }
 });
 
-imageCanvas.addEventListener('click', (e) => {
-  if (isDragging) return;
-
-  const mouse = getCanvasCoordinates(e);
-  const clickedPin = getPinAtPosition(mouse.x, mouse.y);
-
-  if (clickedPin) {
-    activePin = clickedPin;
-  } else {
-    activePin = { x: mouse.x, y: mouse.y, title: '', description: '' };
-  }
-  openNoteModal();
-});
 
 imageCanvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+
+  // Reset drag state to prevent unwanted dragging when right-clicking
+  isDragging = false;
+  dragged = false;
 
   const mouse = getCanvasCoordinates(e);
   const clickedPin = getPinAtPosition(mouse.x, mouse.y);
@@ -194,49 +191,49 @@ saveNoteButton.addEventListener('click', () => {
   renderNotesSidebar();
 });
 
-cancelNoteButton.addEventListener('click', () => {
-  activePin = null;
-  closeNoteModal();
-});
+// cancelNoteButton.addEventListener('click', () => {
+//   activePin = null;
+//   closeNoteModal();
+// });
 
-saveButton.addEventListener('click', async () => {
-  if (!currentImagePath) {
-    alert('Please upload an image first.');
-    return;
-  }
+// saveButton.addEventListener('click', async () => {
+//   if (!currentImagePath) {
+//     alert('Please upload an image first.');
+//     return;
+//   }
+//
+//   const sessionData = {
+//     imagePath: currentImagePath,
+//     pins: pins
+//   };
+//
+//   const result = await window.electronAPI.saveSession(sessionData);
+//
+//   if (result.success) {
+//     alert('Session saved successfully!');
+//   } else {
+//     alert('Session save cancelled.');
+//   }
+// });
 
-  const sessionData = {
-    imagePath: currentImagePath,
-    pins: pins
-  };
-
-  const result = await window.electronAPI.saveSession(sessionData);
-
-  if (result.success) {
-    alert('Session saved successfully!');
-  } else {
-    alert('Session save cancelled.');
-  }
-});
-
-loadButton.addEventListener('click', async () => {
-  const session = await window.electronAPI.loadSession();
-
-  if (session) {
-    img.src = session.imagePath;
-    currentImagePath = session.imagePath;
-    pins = session.pins || [];
-
-    img.onload = () => {
-      scale = 1;
-      originX = 0;
-      originY = 0;
-      drawImage();
-    };
-  } else {
-    alert('No session loaded.');
-  }
-});
+// loadButton.addEventListener('click', async () => {
+//   const session = await window.electronAPI.loadSession();
+//
+//   if (session) {
+//     img.src = session.imagePath;
+//     currentImagePath = session.imagePath;
+//     pins = session.pins || [];
+//
+//     img.onload = () => {
+//       scale = 1;
+//       originX = 0;
+//       originY = 0;
+//       drawImage();
+//     };
+//   } else {
+//     alert('No session loaded.');
+//   }
+// });
 
 searchBar.addEventListener('input', (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
@@ -310,6 +307,44 @@ deletePinButton.addEventListener('click', () => {
 
 document.addEventListener('click', () => {
   contextMenu.style.display = 'none';
+});
+
+exportPdfButton.addEventListener('click', async () => {
+  if (!img.width || !img.height) {
+    await window.electronAPI.showErrorDialog('No image loaded to export.');
+    return;
+  }
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = img.width;
+  exportCanvas.height = img.height;
+  const exportCtx = exportCanvas.getContext('2d');
+
+  exportCtx.drawImage(img, 0, 0);
+
+  pins.forEach(pin => {
+    exportCtx.beginPath();
+    exportCtx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
+    exportCtx.fillStyle = getColorByTag(pin.tag);
+    exportCtx.fill();
+    exportCtx.stroke();
+
+    if (pin.title) {
+      exportCtx.font = "24px Arial";
+      exportCtx.fillStyle = "black";
+      exportCtx.fillText(pin.title, pin.x + 12, pin.y - 12);
+    }
+  });
+
+  const imageData = exportCanvas.toDataURL('image/png');
+
+  const result = await window.electronAPI.exportPdf(imageData);
+
+  if (result.success) {
+    console.log('PDF exported successfully!');
+  } else {
+    console.log('PDF export cancelled.');
+  }
 });
 
 function getCanvasCoordinates(e) {
@@ -445,3 +480,4 @@ function openDeleteModal() {
 function closeDeleteModal() {
   deleteModalOverlay.classList.remove('active');
 }
+

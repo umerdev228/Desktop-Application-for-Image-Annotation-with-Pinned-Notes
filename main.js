@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
+const { jsPDF } = require('jspdf');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -87,5 +88,46 @@ ipcMain.handle('dialog:saveImage', async (event, dataUrl) => {
     fs.writeFileSync(filePath, base64Data, 'base64');
     return { success: true };
   }
+  return { success: false };
+});
+
+ipcMain.handle('dialog:savePdf', async (event, pdfBuffer) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Export as PDF',
+    defaultPath: 'annotated_image.pdf',
+    filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+  });
+
+  if (!canceled && filePath) {
+    fs.writeFileSync(filePath, pdfBuffer);
+    return { success: true };
+  }
+  return { success: false };
+});
+
+
+ipcMain.handle('dialog:exportPdf', async (event, imageDataUrl) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Export as PDF',
+    defaultPath: 'annotated_image.pdf',
+    filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+  });
+
+  if (!canceled && filePath) {
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'px',
+      format: 'a4' // or can use [width, height] if you want original size
+    });
+
+    // Insert image into PDF
+    pdf.addImage(imageDataUrl, 'PNG', 0, 0, 595, 842); // A4 size
+
+    // Save PDF
+    pdf.save(filePath);
+
+    return { success: true };
+  }
+
   return { success: false };
 });
