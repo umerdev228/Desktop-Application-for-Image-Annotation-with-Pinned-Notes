@@ -106,28 +106,70 @@ ipcMain.handle('dialog:savePdf', async (event, pdfBuffer) => {
 });
 
 
-ipcMain.handle('dialog:exportPdf', async (event, imageDataUrl) => {
+ipcMain.handle('dialog:exportPdf', async (event, data) => {
+  const { imageDataUrl, width, height } = data;
+
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Export as PDF',
     defaultPath: 'annotated_image.pdf',
     filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
   });
 
-  if (!canceled && filePath) {
+  if (canceled) return { success: false };
+
+  try {
+    // Create PDF with safe dimensions
+    // Use A4 as the base format for better compatibility
+    const isLandscape = width > height;
     const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'px',
-      format: 'a4' // or can use [width, height] if you want original size
+      orientation: isLandscape ? 'landscape' : 'portrait',
+      unit: 'pt',
+      format: 'a4',
+      compress: true
     });
 
-    // Insert image into PDF
-    pdf.addImage(imageDataUrl, 'PNG', 0, 0, 595, 842); // A4 size
+    // Get page dimensions in points
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // Save PDF
-    pdf.save(filePath);
+    // Calculate the maximum size for the image with margins
+    const margin = 20; // 20pt margin
+    const maxWidth = pageWidth - (margin * 2);
+    const maxHeight = pageHeight - (margin * 2);
+
+    // Calculate scale to fit image on page
+    const scale = Math.min(maxWidth / width, maxHeight / height);
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
+
+    // Center image on page
+    const x = (pageWidth - scaledWidth) / 2;
+    const y = (pageHeight - scaledHeight) / 2;
+
+    // Add the image to PDF
+    pdf.addImage(
+      imageDataUrl,
+      imageDataUrl.includes('image/jpeg') ? 'JPEG' : 'PNG',
+      x, y, scaledWidth, scaledHeight,
+      undefined, 'MEDIUM' // Use medium compression for balance
+    );
+
+    // Save the PDF
+    const pdfBuffer = pdf.output('arraybuffer');
+    fs.writeFileSync(filePath, Buffer.from(pdfBuffer));
 
     return { success: true };
-  }
+  } catch (error) {
+    console.error('PDF export error:', error);
 
-  return { success: false };
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'PDF Export Failed',
+      message: 'Failed to export image as PDF. Try using PNG export instead.',
+      detail: error.message,
+      buttons: ['OK']
+    });
+
+    return { success: false };
+  }
 });

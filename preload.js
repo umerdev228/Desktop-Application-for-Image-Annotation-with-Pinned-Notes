@@ -7,6 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showErrorDialog: (message) => ipcRenderer.invoke('dialog:showError', message),
   saveImage: (dataUrl) => ipcRenderer.invoke('dialog:saveImage', dataUrl),
   savePdf: (pdfBuffer) => ipcRenderer.invoke('dialog:savePdf', pdfBuffer),
-  exportPdf: (imageDataUrl) => ipcRenderer.invoke('dialog:exportPdf', imageDataUrl)
+  exportPdf: (data) => ipcRenderer.invoke('dialog:exportPdf', data),
 
 });

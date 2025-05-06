@@ -10,7 +10,7 @@ const hoverTooltip = document.getElementById('hoverTooltip');
 // const saveButton = document.getElementById('saveSession');
 // const loadButton = document.getElementById('loadSession');
 const modalOverlay = document.getElementById('modalOverlay');
-// const cancelNoteButton = document.getElementById('cancelNote');
+const cancelNoteButton = document.getElementById('cancelNote');
 const searchBar = document.getElementById('searchBar');
 const exportButton = document.getElementById('exportImage');
 const pinTagInput = document.getElementById('pinTag');
@@ -22,6 +22,7 @@ const confirmDeleteButton = document.getElementById('confirmDelete');
 const contextMenu = document.getElementById('contextMenu');
 const deletePinButton = document.getElementById('deletePin');
 const exportPdfButton = document.getElementById('exportPdf');
+const loaderOverlay = document.getElementById('loaderOverlay');
 
 modalOverlay.hidden = true;
 
@@ -54,17 +55,10 @@ resizeCanvas();
 uploadButton.addEventListener('click', async () => {
   const filePath = await window.electronAPI.openImageDialog();
   if (filePath) {
-    const allowedExtensions = ['jpg', 'jpeg', 'png', 'bmp'];
-    const fileExtension = filePath.split('.').pop().toLowerCase();
-
-    if (allowedExtensions.includes(fileExtension)) {
-      img.src = filePath;
-    } else {
-      await window.electronAPI.showErrorDialog('Invalid file type! Please select a JPG, PNG, JPEG, or BMP image.');
-    }
+    showLoader(); // 🔥 Show loader immediately when user selects file
+    img.src = filePath;
   }
 });
-
 
 img.onload = () => {
   scale = 1;
@@ -72,6 +66,8 @@ img.onload = () => {
   originY = 0;
   pins = [];
   drawImage();
+  renderNotesSidebar();
+  hideLoader(); // 🔥 Hide loader when image is completely loaded
 };
 
 imageCanvas.addEventListener('wheel', (e) => {
@@ -151,7 +147,6 @@ imageCanvas.addEventListener('mousemove', (e) => {
   }
 });
 
-
 imageCanvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
 
@@ -191,50 +186,6 @@ saveNoteButton.addEventListener('click', () => {
   renderNotesSidebar();
 });
 
-// cancelNoteButton.addEventListener('click', () => {
-//   activePin = null;
-//   closeNoteModal();
-// });
-
-// saveButton.addEventListener('click', async () => {
-//   if (!currentImagePath) {
-//     alert('Please upload an image first.');
-//     return;
-//   }
-//
-//   const sessionData = {
-//     imagePath: currentImagePath,
-//     pins: pins
-//   };
-//
-//   const result = await window.electronAPI.saveSession(sessionData);
-//
-//   if (result.success) {
-//     alert('Session saved successfully!');
-//   } else {
-//     alert('Session save cancelled.');
-//   }
-// });
-
-// loadButton.addEventListener('click', async () => {
-//   const session = await window.electronAPI.loadSession();
-//
-//   if (session) {
-//     img.src = session.imagePath;
-//     currentImagePath = session.imagePath;
-//     pins = session.pins || [];
-//
-//     img.onload = () => {
-//       scale = 1;
-//       originX = 0;
-//       originY = 0;
-//       drawImage();
-//     };
-//   } else {
-//     alert('No session loaded.');
-//   }
-// });
-
 searchBar.addEventListener('input', (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
   drawImage(); // Redraw to update highlighting
@@ -246,39 +197,42 @@ exportButton.addEventListener('click', async () => {
     return;
   }
 
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = img.width;
-  exportCanvas.height = img.height;
-  const exportCtx = exportCanvas.getContext('2d');
+  showLoader(); // 🔥 Show loader immediately
 
-  exportCtx.drawImage(img, 0, 0);
+  // 🔥 Wait for loader to show, then start heavy export
+  setTimeout(async () => {
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = img.width;
+    exportCanvas.height = img.height;
+    const exportCtx = exportCanvas.getContext('2d');
 
-  pins.forEach(pin => {
-    exportCtx.beginPath();
-    exportCtx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
+    exportCtx.drawImage(img, 0, 0);
 
-    // ✨ Use dynamic color based on tag
-    exportCtx.fillStyle = getColorByTag(pin.tag);
-    exportCtx.fill();
-    exportCtx.stroke();
+    pins.forEach(pin => {
+      exportCtx.beginPath();
+      exportCtx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
+      exportCtx.fillStyle = getColorByTag(pin.tag);
+      exportCtx.fill();
+      exportCtx.stroke();
 
-    // Draw title
-    if (pin.title) {
-      exportCtx.font = "24px Arial";
-      exportCtx.fillStyle = "black";
-      exportCtx.fillText(pin.title, pin.x + 12, pin.y - 12);
+      if (pin.title) {
+        exportCtx.font = "24px Arial";
+        exportCtx.fillStyle = "black";
+        exportCtx.fillText(pin.title, pin.x + 12, pin.y - 12);
+      }
+    });
+
+    const dataURL = exportCanvas.toDataURL('image/png');
+    const result = await window.electronAPI.saveImage(dataURL);
+
+    hideLoader(); // 🔥 Hide loader after export
+
+    if (result.success) {
+      console.log('Image exported successfully!');
+    } else {
+      console.log('Image export cancelled.');
     }
-  });
-
-  const dataURL = exportCanvas.toDataURL('image/png');
-
-  const result = await window.electronAPI.saveImage(dataURL);
-
-  if (result.success) {
-    console.log('Image exported successfully!');
-  } else {
-    console.log('Image export cancelled.');
-  }
+  }, 0); // 🔥 Tiny delay to repaint loader
 });
 
 toggleSidebarButton.addEventListener('click', () => {
@@ -315,36 +269,95 @@ exportPdfButton.addEventListener('click', async () => {
     return;
   }
 
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = img.width;
-  exportCanvas.height = img.height;
-  const exportCtx = exportCanvas.getContext('2d');
+  showLoader();
 
-  exportCtx.drawImage(img, 0, 0);
+  setTimeout(async () => {
+    try {
+      // Step 1: Create a canvas for the exported image with pins
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = img.width;
+      exportCanvas.height = img.height;
+      const exportCtx = exportCanvas.getContext('2d');
 
-  pins.forEach(pin => {
-    exportCtx.beginPath();
-    exportCtx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
-    exportCtx.fillStyle = getColorByTag(pin.tag);
-    exportCtx.fill();
-    exportCtx.stroke();
+      // Draw base image
+      exportCtx.drawImage(img, 0, 0);
 
-    if (pin.title) {
-      exportCtx.font = "24px Arial";
-      exportCtx.fillStyle = "black";
-      exportCtx.fillText(pin.title, pin.x + 12, pin.y - 12);
+      // Draw pins with larger text to ensure visibility
+      pins.forEach(pin => {
+        // Draw pin circle
+        exportCtx.beginPath();
+        exportCtx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
+        exportCtx.fillStyle = getColorByTag(pin.tag);
+        exportCtx.fill();
+        exportCtx.stroke();
+
+        // Draw pin text with increased size
+        if (pin.title) {
+          exportCtx.font = "36px Arial";
+          exportCtx.fillStyle = "black";
+          exportCtx.fillText(pin.title, pin.x + 12, pin.y - 12);
+        }
+      });
+
+      // Step 2: Check if image needs to be scaled to fit PDF limitations
+      const PDF_MAX_DIMENSION = 14000; // Slightly below jsPDF limit of 14400
+      let finalWidth = img.width;
+      let finalHeight = img.height;
+      let needsScaling = false;
+
+      if (finalWidth > PDF_MAX_DIMENSION || finalHeight > PDF_MAX_DIMENSION) {
+        needsScaling = true;
+        const ratio = Math.min(PDF_MAX_DIMENSION / finalWidth, PDF_MAX_DIMENSION / finalHeight);
+        finalWidth = Math.floor(finalWidth * ratio);
+        finalHeight = Math.floor(finalHeight * ratio);
+      }
+
+      // Step 3: If scaling needed, create a resized version
+      let finalImageData;
+
+      if (needsScaling) {
+        const resizeCanvas = document.createElement('canvas');
+        resizeCanvas.width = finalWidth;
+        resizeCanvas.height = finalHeight;
+        const resizeCtx = resizeCanvas.getContext('2d');
+
+        // Use high-quality image smoothing
+        resizeCtx.imageSmoothingEnabled = true;
+        resizeCtx.imageSmoothingQuality = 'high';
+        resizeCtx.drawImage(exportCanvas, 0, 0, finalWidth, finalHeight);
+
+        finalImageData = resizeCanvas.toDataURL('image/jpeg', 0.95);
+      } else {
+        finalImageData = exportCanvas.toDataURL('image/png');
+      }
+
+      // Step 4: Send to main process
+      const result = await window.electronAPI.exportPdf({
+        imageDataUrl: finalImageData,
+        width: finalWidth,
+        height: finalHeight,
+        originalWidth: img.width,
+        originalHeight: img.height
+      });
+
+      hideLoader();
+
+      if (result.success) {
+        console.log('PDF exported successfully!');
+      } else {
+        console.log('PDF export cancelled or failed.');
+      }
+    } catch (error) {
+      hideLoader();
+      console.error('PDF export error:', error);
+      await window.electronAPI.showErrorDialog('Error creating PDF: ' + error.message);
     }
-  });
+  }, 0);
+});
 
-  const imageData = exportCanvas.toDataURL('image/png');
-
-  const result = await window.electronAPI.exportPdf(imageData);
-
-  if (result.success) {
-    console.log('PDF exported successfully!');
-  } else {
-    console.log('PDF export cancelled.');
-  }
+cancelNoteButton.addEventListener('click', () => {
+  closeNoteModal();
+  activePin = null;
 });
 
 function getCanvasCoordinates(e) {
@@ -428,15 +441,6 @@ function drawPin(x, y, highlight = true, label = null, tag = 'default') {
   }
 }
 
-function getColorByTag(tag) {
-  switch (tag) {
-    case 'important': return '#f97316'; // orange
-    case 'warning': return '#eab308';   // yellow
-    case 'info': return '#3b82f6';       // blue
-    default: return '#ef4444';           // red (default)
-  }
-}
-
 function renderNotesSidebar() {
   // Clear everything except the header
   const header = document.getElementById('notesHeader');
@@ -481,3 +485,32 @@ function closeDeleteModal() {
   deleteModalOverlay.classList.remove('active');
 }
 
+function showLoader() {
+  loaderOverlay.hidden = false;
+  loaderOverlay.style.display = 'flex';
+}
+
+function hideLoader() {
+  loaderOverlay.hidden = true;
+  loaderOverlay.style.display = 'none';
+}
+
+// Add this helper function to app.js to convert CSS colors to RGB for PDF
+function getColorRgbByTag(tag) {
+  const hexColor = getColorByTag(tag);
+  // Convert hex to RGB values for PDF
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+// Make sure your getColorByTag function returns hex colors
+function getColorByTag(tag) {
+  switch (tag) {
+    case 'important': return '#f97316'; // orange
+    case 'warning': return '#eab308';   // yellow
+    case 'info': return '#3b82f6';      // blue
+    default: return '#ef4444';          // red (default)
+  }
+}
