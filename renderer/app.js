@@ -7,8 +7,8 @@ const noteTitleInput = document.getElementById('noteTitle');
 const noteDescriptionInput = document.getElementById('noteDescription');
 const saveNoteButton = document.getElementById('saveNote');
 const hoverTooltip = document.getElementById('hoverTooltip');
-// const saveButton = document.getElementById('saveSession');
-// const loadButton = document.getElementById('loadSession');
+const saveButton = document.getElementById('saveSession');
+const loadButton = document.getElementById('loadSession');
 const modalOverlay = document.getElementById('modalOverlay');
 const cancelNoteButton = document.getElementById('cancelNote');
 const searchBar = document.getElementById('searchBar');
@@ -358,6 +358,42 @@ exportPdfButton.addEventListener('click', async () => {
 cancelNoteButton.addEventListener('click', () => {
   closeNoteModal();
   activePin = null;
+});
+
+saveButton.addEventListener('click', async () => {
+  const sessionData = {
+    imagePath: img.src,
+    pins,
+    originX,
+    originY,
+    scale
+  };
+  const result = await window.electronAPI.saveSession(sessionData);
+  if (result.success) {
+    console.log('Session saved.');
+  }
+});
+
+loadButton.addEventListener('click', async () => {
+  const sessionData = await window.electronAPI.loadSession();
+  if (sessionData && sessionData.imagePath) {
+    // Store session values temporarily
+    const sessionPins = sessionData.pins || [];
+    originX = sessionData.originX || 0;
+    originY = sessionData.originY || 0;
+    scale = sessionData.scale || 1;
+
+    // Wait for image to load before applying pins
+    img.onload = () => {
+      pins = sessionPins;
+      drawImage();
+      renderNotesSidebar();
+      hideLoader();
+    };
+
+    showLoader();
+    img.src = sessionData.imagePath;
+  }
 });
 
 function getCanvasCoordinates(e) {
